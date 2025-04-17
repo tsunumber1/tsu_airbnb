@@ -2,7 +2,7 @@
 title: "EDA"
 author: "Tong Su"
 date: "2025-04-17"
-output: pdf_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -34,6 +34,10 @@ print(data_dict)
 ```
 
 ```{r}
+skimr::skim(arb_df)
+```
+
+```{r}
 head(names(arb_df), 20)  
 tail(names(arb_df), 20)  
 
@@ -59,10 +63,12 @@ df_long <- arb_df %>%
 ```{r}
 glimpse(df_long)
 summary(df_long$Date)
+skimr::skim(df_long)
 ```
 
+## Build data dictionary for df_long
+
 ```{r}
-# Build data dictionary for df_long
 data_dict_long <- tibble(
   Variable = names(df_long),
   DataType = sapply(df_long, function(x) class(x)[1]),
@@ -85,7 +91,6 @@ data_dict_long <- tibble(
   )
 )
 
-# View the data dictionary
 print(data_dict_long)
 ```
 

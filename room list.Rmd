@@ -1,0 +1,67 @@
+---
+title: "room list"
+author: "Tong Su"
+date: "2025-04-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Load necessary libraries
+library(tidyverse)
+library(janitor)
+library(skimr)
+```
+
+## Data Import
+
+```{r, message=FALSE, warning=FALSE}
+# Read all CSVs
+file1 <- read_csv("./data/listings file 1 of 4.csv")
+file2 <- read_csv("./data/listings file 2 of 4.csv")
+file3 <- read_csv("./data/listings file 3 of 4.csv")
+file4 <- read_csv("./data/listings file 4 of 4.csv")
+
+names(file2) <- names(file1)
+names(file3) <- names(file1)
+names(file4) <- names(file1)
+
+listings_all <- bind_rows(file1, file2, file3, file4)
+```
+
+```{r}
+dim(listings_all)
+```
+
+## data dictionary 
+
+```{r, message=FALSE, warning=FALSE}
+summarize_var <- function(col, name) {
+  tibble(
+    Variable = name,
+    Type = class(col)[1],
+    Missing = sum(is.na(col)),
+    Unique_Values = n_distinct(col)
+  )
+}
+
+data_dict <- map2_dfr(listings_all, names(listings_all), summarize_var)
+
+data_dict <- data_dict %>%
+  mutate(Variable_Type = case_when(
+    Type %in% c("character", "factor", "logical") ~ "Categorical",
+    Type %in% c("numeric", "integer", "double") ~ "Numerical",
+    TRUE ~ "Other"
+  )) %>%
+  select(Variable, Variable_Type, Type, Missing, Unique_Values)
+
+print(data_dict)
+```
+
+```{r}
+write_csv(data_dict, "./data/listings_data_dictionary.csv")
+```
+
+```{r}
+skim(listings_all)
+```
+
