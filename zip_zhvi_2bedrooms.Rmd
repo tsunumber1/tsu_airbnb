@@ -1,0 +1,176 @@
+---
+title: "EDA"
+author: "Tong Su"
+date: "2025-04-17"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(naniar)     
+library(DataExplorer)
+library(lubridate)
+```
+
+## data structure and dictionary 
+
+```{r dataset}
+arb_df <- read.csv("./data/Zip_Zhvi_2bedroom.csv") 
+
+str(arb_df)
+
+data_dict <- tibble(
+  Variable = names(arb_df),
+  DataType = sapply(arb_df, class),
+  Category = case_when(
+    sapply(arb_df, is.numeric) ~ "Numerical",
+    sapply(arb_df, is.character) | sapply(arb_df, is.factor) ~ "Categorical",
+    TRUE ~ "Other"
+  )
+)
+
+print(data_dict)
+```
+
+```{r}
+head(names(arb_df), 20)  
+tail(names(arb_df), 20)  
+
+# Rename those columns to clean date format
+names(arb_df) <- gsub("^X(\\d{4})\\.(\\d{2})$", "\\1-\\2", names(arb_df))
+```
+
+```{r}
+ts_cols <- names(arb_df)[grepl("^\\d{4}-\\d{2}$", names(arb_df))]
+length(ts_cols)
+```
+
+```{r}
+df_long <- arb_df %>%
+  pivot_longer(
+    cols = all_of(ts_cols),
+    names_to = "Date",
+    values_to = "Price"
+  ) %>%
+  mutate(Date = as.Date(paste0(Date, "-01"), format = "%Y-%m-%d"))
+```
+
+```{r}
+glimpse(df_long)
+summary(df_long$Date)
+```
+
+```{r}
+# Build data dictionary for df_long
+data_dict_long <- tibble(
+  Variable = names(df_long),
+  DataType = sapply(df_long, function(x) class(x)[1]),
+  Category = case_when(
+    sapply(df_long, is.numeric) ~ "Numerical",
+    sapply(df_long, is.character) | sapply(df_long, is.factor) ~ "Categorical",
+    inherits(df_long, "Date") ~ "Date",
+    TRUE ~ "Other"
+  ),
+  Description = c(
+    "Unique identifier for region",
+    "ZIP code or area name",
+    "City name",
+    "State abbreviation",
+    "Metro area name",
+    "County name",
+    "National size rank of the region",
+    "Month of the observation (converted to Date)",
+    "Zillow Home Value Index (ZHVI) for 2-bedroom homes"
+  )
+)
+
+# View the data dictionary
+print(data_dict_long)
+```
+
+```{r}
+df_long %>%
+  group_by(Date) %>%
+  summarise(AvgPrice = mean(Price, na.rm = TRUE)) %>%
+  ggplot(aes(x = Date, y = AvgPrice)) +
+  geom_line(color = "steelblue") +
+  labs(title = "National Average 2-Bedroom Home Price Over Time",
+       x = "Date", y = "Average Price") +
+  theme_minimal()
+```
+
+```{r}
+top_cities <- df_long %>%
+  count(City, sort = TRUE) %>%
+  slice_max(n, n = 6) %>%
+  pull(City)
+
+df_long %>%
+  filter(City %in% top_cities) %>%
+  group_by(City, Date) %>%
+  summarise(AvgPrice = mean(Price, na.rm = TRUE)) %>%
+  ggplot(aes(x = Date, y = AvgPrice, color = City)) +
+  geom_line() +
+  labs(title = "Housing Price Trends by City", x = "Date", y = "Average Price") +
+  theme_minimal()
+```
+
+```{r}
+df_long %>%
+  group_by(Date) %>%
+  summarise(MissingCount = sum(is.na(Price))) %>%
+  ggplot(aes(x = Date, y = MissingCount)) +
+  geom_line(color = "darkred") +
+  labs(title = "Missing Price Data Over Time", x = "Date", y = "Number of Missing Values") +
+  theme_minimal()
+```
+
+```{r}
+df_long %>%
+  group_by(RegionID) %>%
+  arrange(Date) %>%
+  mutate(MoM_Change = Price - lag(Price)) %>%
+  filter(!is.na(MoM_Change)) %>%
+  group_by(Date) %>%
+  summarise(AvgMoMChange = mean(MoM_Change, na.rm = TRUE)) %>%
+  ggplot(aes(x = Date, y = AvgMoMChange)) +
+  geom_line(color = "darkgreen") +
+  labs(title = "Average Month-over-Month Price Change (National)", x = "Date", y = "Average Change") +
+  theme_minimal()
+```
+
+```{r}
+df_nyc <- df_long %>%
+  filter(State == "NY", City == "New York")
+```
+
+```{r}
+df_nyc %>%
+  group_by(Date) %>%
+  summarise(AvgPrice = mean(Price, na.rm = TRUE)) %>%
+  ggplot(aes(x = Date, y = AvgPrice)) +
+  geom_line(color = "blue") +
+  labs(title = "Average 2-Bedroom Price in New York State Over Time",
+       x = "Date", y = "Average Price") +
+  theme_minimal()
+```
+
+```{r}
+top_zips <- df_nyc %>%
+  count(RegionName, sort = TRUE) %>%
+  slice_max(n, n = 5) %>%
+  pull(RegionName)
+
+df_nyc %>%
+  filter(RegionName %in% top_zips) %>%
+  group_by(RegionName, Date) %>%
+  summarise(AvgPrice = mean(Price, na.rm = TRUE)) %>%
+  ggplot(aes(x = Date, y = AvgPrice, color = as.factor(RegionName))) +
+  geom_line() +
+  labs(title = "2-Bedroom Home Prices by ZIP Code (Top 5 in NY)",
+       x = "Date", y = "Average Price", color = "ZIP Code") +
+  theme_minimal()
+```
+
+
